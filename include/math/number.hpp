@@ -76,16 +76,47 @@ public:
     QNumber(){}
     QNumber(Integer n, Integer d = 1, Sign s = Sign::Positive): _n(n), _d(d), SignedNumber(s) {}
     Float tof64() override { return (float)this->_n / this->_d; }
-    friend std::ostream& operator<<(std::ostream& os, QNumber n);
+
+    void force_gcd(){
+        auto den = greatest_common_denominator(this->_d, this->_n);
+        this->_d /= den;
+        this->_n /= den;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const QNumber& n);
+
+    friend bool operator>(const QNumber& a, const QNumber& b);
+
+    friend QNumber operator+(const QNumber& a, const QNumber& b);
+    friend QNumber operator-(const QNumber& a, const QNumber& b);
+    friend QNumber operator*(const QNumber& a, const QNumber& b);
+    friend QNumber operator/(const QNumber& a, const QNumber& b);
 };
 
-inline std::ostream& operator<<(std::ostream& os, QNumber n){
+inline std::ostream& operator<<(std::ostream& os, const QNumber& n){
     os << n._s << n._n << " / " << n._d;
     return os;
 }
 
-inline QNumber operator+(QNumber a, QNumber b){
-    return a;
+inline bool operator>(const QNumber& a, const QNumber& b){
+    return a._n * b._d > b._n * a._d;
+}
+
+inline QNumber operator+(const QNumber& a, const QNumber& b){
+    QNumber out= { };
+    if(a._s == b._s){
+        out._n = a._n * b._d + b._n * a._d;
+        out._d = b._d * a._d;
+        out._s = a._s;
+    }
+    else{
+        auto max = std::max(a, b);
+        out._s = a._s;
+        out._n = a._n * b._d + b._n * a._d;
+        out._d = b._d * a._d;
+
+    }
+    return out;
 }
 
 }
