@@ -1,2 +1,4 @@
 .cache/
 mathlib_test
+vgcore.*
+test.log

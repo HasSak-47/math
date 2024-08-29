@@ -1,30 +1,16 @@
 #ifndef __MATH_NUMBER_HPP__
 #define __MATH_NUMBER_HPP__
 
+#include <cmath>
 #include <ostream>
+#include <sstream>
+#include <stdexcept>
 
 #include "./math.hpp"
 
 // god so much of this is inlined
 // this should not continue
 namespace Ly::Math{
-
-
-inline std::ostream& operator<<(std::ostream& os, Sign s){
-    auto flags = os.flags();
-    if(s == Sign::Negative){
-        os << '-';
-    }
-    else if(flags | std::ios_base::showpos){
-        os << '+';
-    }
-
-    return os;
-}
-
-inline Sign operator!(Sign a){
-    return a == Sign::Positive ? Sign::Positive : Sign::Negative;
-}
 
 class SignedNumber{
 protected:
@@ -33,7 +19,8 @@ public:
     SignedNumber() {}
     SignedNumber(Sign s) : _s(s) {}
     virtual ~SignedNumber() {};
-    virtual Float tof64() = 0;
+    virtual Float to_float() = 0;
+    virtual Integer to_integer() = 0;
     void set_abs() {
         this->_s = Sign::Positive;
     }
@@ -47,7 +34,8 @@ public:
     NNumber(Integer n, Sign s = Sign::Positive) : _n(n), SignedNumber(s){}
 
     ~NNumber() {}
-    Float tof64() override { return _n; }
+    Float to_float() override { return _n; }
+    Integer to_integer() override { return _n; }
 
     friend std::ostream& operator<<(std::ostream& os, NNumber n);
 };
@@ -71,11 +59,26 @@ inline NNumberOverride(operator/, /);
 
 class QNumber: public SignedNumber{
 protected:
-    Integer _n = 0, _d = 1;
+    enum Flags {
+        Infinity,
+    } _flags;
+    Integer _n, _d;
 public:
-    QNumber(){}
-    QNumber(Integer n, Integer d = 1, Sign s = Sign::Positive): _n(n), _d(d), SignedNumber(s) {}
-    Float tof64() override { return (float)this->_n / this->_d; }
+    QNumber(Integer n = 0, Integer d = 1, Sign s = Sign::Positive): _n(n), _d(d), SignedNumber(s) {
+        if(d == 0){
+            std::stringstream ss;
+            ss << "QNumber::QNumber(" << n << ", " << d << ", " << s << ") : d is 0";
+            throw std::runtime_error(ss.str());
+        }
+    }
+    Float to_float() override { 
+        if((this->_flags | Flags::Infinity) != 0){
+            return INFINITY;
+        }
+        return ((Float)this->_d) / this->_n;
+    }
+    Integer to_integer() override { return this->_n / this->_d; }
+    bool is_zero() { return this->_d == 0; }
 
     void force_gcd(){
         auto den = greatest_common_denominator(this->_d, this->_n);
@@ -85,7 +88,12 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const QNumber& n);
 
-    friend bool operator>(const QNumber& a, const QNumber& b);
+    friend bool operator<(const QNumber& a, const QNumber& b);
+    operator Float() const {
+        return make_number(this->_s) * (Float(this->_d) / this->_d);
+    };
+
+    friend QNumber operator-(const QNumber& a);
 
     friend QNumber operator+(const QNumber& a, const QNumber& b);
     friend QNumber operator-(const QNumber& a, const QNumber& b);
@@ -98,12 +106,17 @@ inline std::ostream& operator<<(std::ostream& os, const QNumber& n){
     return os;
 }
 
-inline bool operator>(const QNumber& a, const QNumber& b){
-    return a._n * b._d > b._n * a._d;
+inline bool operator<(const QNumber& a, const QNumber& b){
+    return a._n * b._d < b._n * a._d;
+}
+inline QNumber operator-(const QNumber& a){
+    auto c = a;
+    c._s = !a._s;
+    return c;
 }
 
 inline QNumber operator+(const QNumber& a, const QNumber& b){
-    QNumber out= { };
+    QNumber out = {};
     if(a._s == b._s){
         out._n = a._n * b._d + b._n * a._d;
         out._d = b._d * a._d;
@@ -111,11 +124,44 @@ inline QNumber operator+(const QNumber& a, const QNumber& b){
     }
     else{
         auto max = std::max(a, b);
-        out._s = a._s;
-        out._n = a._n * b._d + b._n * a._d;
-        out._d = b._d * a._d;
-
+        auto min = std::min(a, b);
+        out._s = max._s;
+        out._n = max._n * min._d - min._n * max._d;
+        out._d = min._d * max._d;
     }
+    out.force_gcd();
+
+    return out;
+}
+
+inline QNumber operator-(const QNumber& a, const QNumber& b){
+    return a + -b;
+}
+
+inline QNumber operator*(const QNumber& a, const QNumber& b){
+    QNumber out = {
+        a._n * b._n,
+        a._d * b._d,
+        a._s * b._s
+    };
+    out.force_gcd();
+
+    return out;
+}
+
+inline QNumber operator/(const QNumber& a, const QNumber& b){
+    QNumber out = {
+        a._n * b._d,
+        a._d * b._n,
+        a._s * b._s
+    };
+
+    if(out._d != 0)
+        out.force_gcd();
+    if(a._n == 0 || b._n == 0){
+        out._flags = (QNumber::Flags)(out._flags | (int)QNumber::Flags::Infinity);
+    }
+
     return out;
 }
 
