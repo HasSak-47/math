@@ -14,6 +14,7 @@ class MatrixT{
 private:
     T _data[WIDTH][HEIGHT] = {};
 public:
+    MatrixT(){ }
 	T& get(size_t i , size_t j) {
 		if(i >= WIDTH){
 			std::stringstream ss;

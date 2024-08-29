@@ -60,3 +60,5 @@ bool test_numbers(bool force_log){
 
     return any_err;
 }
+
+bool test_matrix(bool force_log){ return true; }
